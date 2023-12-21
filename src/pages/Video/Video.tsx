@@ -6,6 +6,8 @@ import {
   Stack,
   Tooltip,
 } from "@mui/joy";
+import dashjs from "dashjs";
+import { useEffect, useRef } from "react";
 import { IoMdEye } from "react-icons/io";
 import { MdThumbUp } from "react-icons/md";
 import { Navigate, useParams } from "react-router-dom";
@@ -14,10 +16,47 @@ import VideoCard from "../../components/VideoCard";
 
 const { format } = Intl.NumberFormat("en", { notation: "compact" });
 const { format: split } = Intl.NumberFormat();
+const API_ENDPOINT = "https://invidious.fdn.fr/";
 
 const Video = () => {
   const { videoId } = useParams();
+
   const { data: video, isLoading } = useGetVideo(videoId ?? "");
+  const videoRef = useRef(null);
+
+  useEffect(() => {
+    let isMounted = false;
+    const player = dashjs.MediaPlayer().create();
+    player.extend(
+      "RequestModifier",
+      function () {
+        return {
+          modifyRequestURL: function (url: string) {
+            if (
+              /^https:\/\/www\.youtube\.com\/youtubei\/.*|^https:\/\/.*\.googlevideo\.com\/videoplayback\?.*/.test(
+                url
+              )
+            )
+              return url.replace(
+                /https:\/\/www\.youtube\.com\/youtubei\/|https:\/\/.*\.googlevideo\.com./gi,
+                API_ENDPOINT
+              );
+
+            return url;
+          },
+        };
+      },
+      true
+    );
+    if (video?.dashUrl) {
+      player.initialize(videoRef.current!, video.dashUrl, false);
+      isMounted = true;
+    }
+
+    return () => {
+      if (isMounted) player.reset();
+    };
+  }, [video?.dashUrl]);
 
   if (!videoId) return <Navigate to="/" />;
   if (isLoading) return <CircularProgress />;
@@ -25,32 +64,9 @@ const Video = () => {
 
   return (
     <Container>
-      <Stack direction="row">
+      <Stack direction={{ xs: "column" }}>
         <Box flex={1}>
-          <video height={300} width={480} controls>
-            <source src={video.dashUrl} type="application/dash+xml" />
-            {video.adaptiveFormats
-              // .filter((format) => format.encoding === "h264")
-              .map((format) => (
-                <source
-                  key={format.url}
-                  src={`${format.url}`}
-                  type={format.type}
-                  // title={format.resolution}
-                />
-              ))}
-            {/* {video.captions.map((caption) => (
-              <track
-                kind="subtitles"
-                srcLang={caption.language_code}
-                src={`https://invidious.fdn.fr/${caption.url}`}
-                label={caption.label}
-                default={caption.label === "English"}
-              />
-            ))} */}
-            {/* <source src={url} type={type} /> */}
-            Video not supported
-          </video>
+          <video ref={videoRef} controls width={"100%"} muted />
           <h3>{video.title}</h3>
           <p>{video.description}</p>
 
@@ -84,7 +100,6 @@ const Video = () => {
           ))}
         </Box>
       </Stack>
-      <pre>{JSON.stringify(video, null, 2)}</pre>
     </Container>
   );
 };
