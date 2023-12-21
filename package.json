@@ -24,6 +24,7 @@
     "react-router-dom": "^6.20.1"
   },
   "devDependencies": {
+    "@tauri-apps/cli": "^1.5.9",
     "@types/axios": "^0.14.0",
     "@types/lodash.debounce": "^4.0.9",
     "@types/react": "^18.2.37",
